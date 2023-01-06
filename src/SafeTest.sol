@@ -73,7 +73,7 @@ struct AdvancedSafeInitParams {
     address payable refundReceiver;
 }
 
-struct SafeTest {
+struct TestSafe {
     uint256[] ownerPKs;
     address[] owners;
     uint256 threshold;
@@ -84,7 +84,8 @@ struct SafeTest {
 }
 
 contract SafeTestTools {
-    SafeTest internal safeTest;
+    //TODO: using for perogative to implement functions like "execeute", "enableModule", etc
+    TestSafe internal testSafe;
 
     /// takes in private keys, stores computed address?
     function _setupSafe(
@@ -93,47 +94,49 @@ contract SafeTestTools {
         uint256 initialBalance,
         AdvancedSafeInitParams memory advancedParams
     ) public {
-        //TODO: require ownerPKs.length > 0 || safeTest.ownerPKs.length > 0
+        // TODO: require ownerPKs.length > 0 || testSafe.ownerPKs.length > 0
         uint256[] memory sortedPKs = sortPKsByComputedAddress(ownerPKs);
         address[] memory owners;
         for (uint256 i; i < sortedPKs.length; i++)
             owners[i] = getAddr(sortedPKs[i]);
 
         // store the initialization parameters
-        safeTest.ownerPKs = sortedPKs;
-        safeTest.owners = owners;
-        safeTest.threshold = threshold;
+        testSafe.ownerPKs = sortedPKs;
+        testSafe.owners = owners;
+        testSafe.threshold = threshold;
         // setup safe ecosystem, singleton, proxy factory, fallback handler, and create a new safe
-        safeTest.singleton = new GnosisSafe();
-        safeTest.proxyFactory = new GnosisSafeProxyFactory();
-        safeTest.handler = new CompatibilityFallbackHandler();
-        safeTest.safe = GnosisSafe(
+        testSafe.singleton = new GnosisSafe();
+        testSafe.proxyFactory = new GnosisSafeProxyFactory();
+        testSafe.handler = new CompatibilityFallbackHandler();
+        testSafe.safe = GnosisSafe(
             payable(
                 advancedParams.saltNonce != 0
-                    ? safeTest.proxyFactory.createProxyWithNonce(
-                        address(safeTest.singleton),
+                    ? testSafe.proxyFactory.createProxyWithNonce(
+                        address(testSafe.singleton),
                         advancedParams.initData,
                         advancedParams.saltNonce
                     )
-                    : safeTest.proxyFactory.createProxy(
-                        address(safeTest.singleton),
+                    : testSafe.proxyFactory.createProxy(
+                        address(testSafe.singleton),
                         advancedParams.initData
                     )
             )
         );
 
-        Vm(VM_ADDR).deal(address(safeTest.safe), initialBalance);
-        safeTest.safe.setup({
-            _owners: safeTest.owners,
-            _threshold: safeTest.threshold,
+        Vm(VM_ADDR).deal(address(testSafe.safe), initialBalance);
+        testSafe.safe.setup({
+            _owners: testSafe.owners,
+            _threshold: testSafe.threshold,
             to: advancedParams.setupModulesCall_to, //address(0),
             data: advancedParams.setupModulesCall_data, // "",
             fallbackHandler: advancedParams.includeFallbackHandler
-                ? address(safeTest.handler)
+                ? address(testSafe.handler)
                 : address(0),
             paymentToken: advancedParams.refundToken, //address(0),
             payment: advancedParams.refundAmount, //0,
             paymentReceiver: advancedParams.refundReceiver
         });
     }
+
+    /// has all the init variants
 }
