@@ -5,13 +5,35 @@ import "forge-std/Test.sol";
 import "solady/utils/LibSort.sol";
 import "safe-contracts/GnosisSafe.sol";
 import "safe-contracts/proxies/GnosisSafeProxyFactory.sol";
-import "safe-contracts/handler/CompatibilityFallbackHandler.sol";
-// import "safe-contracts/examples/SignMessage.sol";
+import "safe-contracts/examples/libraries/SignMessage.sol";
+import "./CompatibilityFallbackHandler_1_3_0.sol";
+import "safe-contracts/examples/libraries/SignMessage.sol";
 
 address constant VM_ADDR = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+bytes12 constant ADDR_MASK = 0xffffffffffffffffffffffff;
 
-function getAddr(uint256 pk) returns (address) {
+function getAddr(uint256 pk) pure returns (address) {
     return Vm(VM_ADDR).addr(pk);
+}
+
+function encodeSmartContractWalletAsPK(address addr) pure returns (uint256 encodedPK) {
+    assembly {
+        let addr_b32 := addr
+        encodedPK := or(addr, ADDR_MASK)
+    }
+}
+
+function decodeSmartContractWalletAsAddress(uint256 pk) pure returns (address decodedAddr) {
+    assembly {
+        let addr := shl(96, pk)
+        decodedAddr := shr(96, addr)
+    }
+}
+
+function isSmartContractPK(uint256 pk) pure returns (bool isEncoded) {
+    assembly {
+        isEncoded := eq(shr(160, pk), shr(160, ADDR_MASK))
+    }
 }
 
 library Sort {
@@ -21,9 +43,7 @@ library Sort {
     }
 }
 
-function sortPKsByComputedAddress(uint256[] memory _pks)
-    returns (uint256[] memory)
-{
+function sortPKsByComputedAddress(uint256[] memory _pks) pure returns (uint256[] memory) {
     uint256[] memory sortedPKs = new uint256[](_pks.length);
 
     address[] memory addresses = new address[](_pks.length);
@@ -52,17 +72,16 @@ function sortPKsByComputedAddress(uint256[] memory _pks)
         sortedPKs[j] = pk;
     }
 
-    if (found < _pks.length)
-        revert(
-            "issue with private key sorting, please open a ticket on github"
-        );
+    if (found < _pks.length) {
+        revert("issue with private key sorting, please open a ticket on github");
+    }
     return sortedPKs;
 }
 
+// collapsed interface that includes comapatibilityfallback handler calls
+abstract contract DeployedSafe is GnosisSafe, CompatibilityFallbackHandler {}
+
 struct AdvancedSafeInitParams {
-    uint256[] ownerPKs;
-    uint256 threshold;
-    uint256 initialBalance;
     bool includeFallbackHandler;
     bytes initData;
     uint256 saltNonce;
@@ -73,19 +92,193 @@ struct AdvancedSafeInitParams {
     address payable refundReceiver;
 }
 
-struct TestSafe {
+struct SafeInstance {
+    uint256 instanceId;
     uint256[] ownerPKs;
     address[] owners;
     uint256 threshold;
-    GnosisSafe safe;
-    GnosisSafe singleton;
-    GnosisSafeProxyFactory proxyFactory;
-    CompatibilityFallbackHandler handler;
+    DeployedSafe safe;
+}
+
+library TestSafeLib {
+    function execTransaction(
+        SafeInstance memory instance,
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        bytes memory signatures
+    ) public returns (bool) {
+        if (instance.owners.length == 0) {
+            revert("SAFETEST: Instance not initialized. Call _setupSafe() to initialize a test safe");
+        }
+
+        bytes32 safeTxHash;
+        {
+            uint256 _nonce = instance.safe.nonce();
+            safeTxHash = instance.safe.getTransactionHash({
+                to: to,
+                value: value,
+                data: data,
+                operation: operation,
+                safeTxGas: safeTxGas,
+                baseGas: baseGas,
+                gasPrice: gasPrice,
+                gasToken: gasToken,
+                refundReceiver: refundReceiver,
+                _nonce: _nonce
+            });
+        }
+
+        if (signatures.length == 0) {
+            for (uint256 i; i < instance.ownerPKs.length; ++i) {
+                uint256 pk = instance.ownerPKs[i];
+                (uint8 v, bytes32 r, bytes32 s) = Vm(VM_ADDR).sign(pk, safeTxHash);
+                if (isSmartContractPK(pk)) {
+                    v = 0;
+                    address addr = decodeSmartContractWalletAsAddress(pk);
+                    assembly {
+                        r := addr
+                    }
+                    console.logBytes32(r);
+                }
+                signatures = bytes.concat(signatures, abi.encodePacked(r, s, v));
+            }
+        }
+
+        return instance.safe.execTransaction({
+            to: to,
+            value: value,
+            data: data,
+            operation: operation,
+            safeTxGas: safeTxGas,
+            baseGas: baseGas,
+            gasPrice: gasPrice,
+            gasToken: gasToken,
+            refundReceiver: payable(refundReceiver),
+            signatures: signatures
+        });
+    }
+
+    function execTransaction(
+        SafeInstance memory instance,
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) public returns (bool) {
+        return execTransaction(instance, to, value, data, operation, 0, 0, 0, address(0), address(0), "");
+    }
+
+    /// @dev performs a noraml "call"
+    function execTransaction(SafeInstance memory instance, address to, uint256 value, bytes memory data)
+        public
+        returns (bool)
+    {
+        return execTransaction(instance, to, value, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), "");
+    }
+
+    function enableModule(SafeInstance memory instance, address module) public {
+        execTransaction(
+            instance,
+            address(instance.safe),
+            0,
+            abi.encodeWithSelector(ModuleManager.enableModule.selector, module),
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            address(0),
+            ""
+        );
+    }
+
+    function disableModule(SafeInstance memory instance, address module) public {
+        execTransaction(
+            instance,
+            address(instance.safe),
+            0,
+            abi.encodeWithSelector(ModuleManager.disableModule.selector, module),
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            address(0),
+            ""
+        );
+    }
+
+    function EIP1271Sign(SafeInstance memory instance, bytes memory data) public {
+        address signMessageLib = address(new SignMessageLib());
+        execTransaction({
+            instance: instance,
+            to: signMessageLib,
+            value: 0,
+            data: abi.encodeWithSelector(SignMessageLib.signMessage.selector, data),
+            operation: Enum.Operation.DelegateCall,
+            safeTxGas: 0,
+            baseGas: 0,
+            gasPrice: 0,
+            gasToken: address(0),
+            refundReceiver: payable(address(0)),
+            signatures: ""
+        });
+    }
+
+    function EIP1271Sign(SafeInstance memory instance, bytes32 digest) public {
+        EIP1271Sign(instance, abi.encodePacked(digest));
+    }
+
+    function signTransaction(
+        SafeInstance memory instance,
+        uint256 pk,
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver
+    ) public view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 txDataHash;
+        {
+            uint256 _nonce = instance.safe.nonce();
+            txDataHash = instance.safe.getTransactionHash({
+                to: to,
+                value: value,
+                data: data,
+                operation: operation,
+                safeTxGas: safeTxGas,
+                baseGas: baseGas,
+                gasPrice: gasPrice,
+                gasToken: gasToken,
+                refundReceiver: refundReceiver,
+                _nonce: _nonce
+            });
+        }
+
+        (v, r, s) = Vm(VM_ADDR).sign(pk, txDataHash);
+    }
 }
 
 contract SafeTestTools {
-    //TODO: using for perogative to implement functions like "execeute", "enableModule", etc
-    TestSafe internal testSafe;
+    using TestSafeLib for SafeInstance;
+
+    GnosisSafe internal singleton = new GnosisSafe();
+    GnosisSafeProxyFactory internal proxyFactory = new GnosisSafeProxyFactory();
+    CompatibilityFallbackHandler internal handler = new CompatibilityFallbackHandler();
+
+    SafeInstance[] internal instances;
+    // TODO: using for perogative to implement functions like "execute", "enableModule", etc
 
     /// takes in private keys, stores computed address?
     function _setupSafe(
@@ -93,50 +286,138 @@ contract SafeTestTools {
         uint256 threshold,
         uint256 initialBalance,
         AdvancedSafeInitParams memory advancedParams
-    ) public {
-        // TODO: require ownerPKs.length > 0 || testSafe.ownerPKs.length > 0
+    ) public returns (SafeInstance memory) {
         uint256[] memory sortedPKs = sortPKsByComputedAddress(ownerPKs);
-        address[] memory owners;
-        for (uint256 i; i < sortedPKs.length; i++)
-            owners[i] = getAddr(sortedPKs[i]);
+        address[] memory owners = new address[](sortedPKs.length);
 
-        // store the initialization parameters
-        testSafe.ownerPKs = sortedPKs;
-        testSafe.owners = owners;
-        testSafe.threshold = threshold;
-        // setup safe ecosystem, singleton, proxy factory, fallback handler, and create a new safe
-        testSafe.singleton = new GnosisSafe();
-        testSafe.proxyFactory = new GnosisSafeProxyFactory();
-        testSafe.handler = new CompatibilityFallbackHandler();
-        testSafe.safe = GnosisSafe(
+        for (uint256 i; i < sortedPKs.length; i++) {
+            if (isSmartContractPK(sortedPKs[i])) {
+                owners[i] = decodeSmartContractWalletAsAddress(sortedPKs[i]);
+            } else {
+                owners[i] = getAddr(sortedPKs[i]);
+            }
+        }
+
+        DeployedSafe safe0 = DeployedSafe(
             payable(
                 advancedParams.saltNonce != 0
-                    ? testSafe.proxyFactory.createProxyWithNonce(
-                        address(testSafe.singleton),
-                        advancedParams.initData,
-                        advancedParams.saltNonce
+                    ? proxyFactory.createProxyWithNonce(
+                        address(singleton), advancedParams.initData, advancedParams.saltNonce
                     )
-                    : testSafe.proxyFactory.createProxy(
-                        address(testSafe.singleton),
-                        advancedParams.initData
-                    )
+                    : proxyFactory.createProxy(address(singleton), advancedParams.initData)
             )
         );
 
-        Vm(VM_ADDR).deal(address(testSafe.safe), initialBalance);
-        testSafe.safe.setup({
-            _owners: testSafe.owners,
-            _threshold: testSafe.threshold,
-            to: advancedParams.setupModulesCall_to, //address(0),
+        SafeInstance memory instance0 = SafeInstance({
+            instanceId: instances.length,
+            ownerPKs: sortedPKs,
+            owners: owners,
+            threshold: threshold,
+            // setup safe ecosystem, singleton, proxy factory, fallback handler, and create a new safe
+            safe: safe0
+        });
+        instances.push(instance0);
+
+        // store the initialization parameters
+
+        Vm(VM_ADDR).deal(address(safe0), initialBalance);
+        safe0.setup({
+            _owners: instance0.owners,
+            _threshold: instance0.threshold,
+            to: advancedParams.setupModulesCall_to, // address(0),
             data: advancedParams.setupModulesCall_data, // "",
-            fallbackHandler: advancedParams.includeFallbackHandler
-                ? address(testSafe.handler)
-                : address(0),
-            paymentToken: advancedParams.refundToken, //address(0),
-            payment: advancedParams.refundAmount, //0,
+            fallbackHandler: advancedParams.includeFallbackHandler ? address(handler) : address(0),
+            paymentToken: advancedParams.refundToken, // address(0),
+            payment: advancedParams.refundAmount, // 0,
             paymentReceiver: advancedParams.refundReceiver
         });
+        return instance0;
     }
 
-    /// has all the init variants
+    function _setupSafe(uint256[] memory ownerPKs, uint256 threshold, uint256 initialBalance)
+        public
+        returns (SafeInstance memory)
+    {
+        return _setupSafe(
+            ownerPKs,
+            threshold,
+            initialBalance,
+            AdvancedSafeInitParams({
+                includeFallbackHandler: true,
+                initData: "",
+                saltNonce: 0,
+                setupModulesCall_to: address(0),
+                setupModulesCall_data: "",
+                refundAmount: 0,
+                refundToken: address(0),
+                refundReceiver: payable(address(0))
+            })
+        );
+    }
+
+    function _setupSafe(uint256[] memory ownerPKs, uint256 threshold) public returns (SafeInstance memory) {
+        return _setupSafe(
+            ownerPKs,
+            threshold,
+            0,
+            AdvancedSafeInitParams({
+                includeFallbackHandler: true,
+                initData: "",
+                saltNonce: 0,
+                setupModulesCall_to: address(0),
+                setupModulesCall_data: "",
+                refundAmount: 0,
+                refundToken: address(0),
+                refundReceiver: payable(address(0))
+            })
+        );
+    }
+
+    function _setupSafe() public returns (SafeInstance memory) {
+        string[3] memory users;
+        users[0] = "SAFETEST: Alice";
+        users[1] = "SAFETEST: Bob";
+        users[2] = "SAFETEST: Charlie";
+        uint256[] memory defaultPKs = new uint256[](3);
+
+        for (uint256 i; i < 3; i++) {
+            defaultPKs[i] = (uint256(keccak256(bytes(users[i]))));
+            Vm(VM_ADDR).label(getAddr(defaultPKs[i]), users[i]);
+        }
+
+        return _setupSafe(
+            defaultPKs,
+            2,
+            0,
+            AdvancedSafeInitParams({
+                includeFallbackHandler: true,
+                initData: "",
+                saltNonce: 0,
+                setupModulesCall_to: address(0),
+                setupModulesCall_data: "",
+                refundAmount: 0,
+                refundToken: address(0),
+                refundReceiver: payable(address(0))
+            })
+        );
+    }
+
+    struct SafeTransaction {
+        address to;
+        uint256 value;
+        bytes data;
+        Enum.Operation operation;
+    }
+
+    function getSafe() public view returns (SafeInstance memory) {
+        if (instances.length == 0) revert("Test Safe has not been deployed, use _setupSafe() calling safe()");
+        return instances[0];
+    }
+
+    function getSafe(address _safe) public view returns (SafeInstance memory) {
+        for (uint256 i; i < instances.length; ++i) {
+            if (address(instances[i].safe) == _safe) return instances[i];
+        }
+        revert("Safe instance not found");
+    }
 }
