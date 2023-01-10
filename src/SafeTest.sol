@@ -73,7 +73,7 @@ function sortPKsByComputedAddress(uint256[] memory _pks) pure returns (uint256[]
     }
 
     if (found < _pks.length) {
-        revert("issue with private key sorting, please open a ticket on github");
+        revert("SAFETESTTOOLS: issue with private key sorting, please open a ticket on github");
     }
     return sortedPKs;
 }
@@ -200,11 +200,23 @@ library TestSafeLib {
     }
 
     function disableModule(SafeInstance memory instance, address module) public {
+        (address[] memory modules,) = instance.safe.getModulesPaginated(SENTINEL_MODULES, 1000);
+        address prevModule = SENTINEL_MODULES;
+        bool moduleFound;
+        for (uint256 i; i < modules.length; i++) {
+            if (modules[i] == module) {
+                moduleFound = true;
+                break;
+            }
+            prevModule = modules[i];
+        }
+        if (!moduleFound) revert("SAFETESTTOOLS: cannot disable module that is not enabled");
+
         execTransaction(
             instance,
             address(instance.safe),
             0,
-            abi.encodeWithSelector(ModuleManager.disableModule.selector, module),
+            abi.encodeWithSelector(ModuleManager.disableModule.selector, prevModule, module),
             Enum.Operation.Call,
             0,
             0,
@@ -268,6 +280,13 @@ library TestSafeLib {
 
         (v, r, s) = Vm(VM_ADDR).sign(pk, txDataHash);
     }
+
+    function incrementNonce(
+        SafeInstance memory instance
+    ) public returns (uint256 newNonce) {
+        execTransaction(instance, address(0), 0, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0), "");
+        return instance.safe.nonce();
+    }
 }
 
 contract SafeTestTools {
@@ -278,9 +297,8 @@ contract SafeTestTools {
     CompatibilityFallbackHandler internal handler = new CompatibilityFallbackHandler();
 
     SafeInstance[] internal instances;
-    // TODO: using for perogative to implement functions like "execute", "enableModule", etc
-
     /// takes in private keys, stores computed address?
+
     function _setupSafe(
         uint256[] memory ownerPKs,
         uint256 threshold,
@@ -359,7 +377,7 @@ contract SafeTestTools {
         return _setupSafe(
             ownerPKs,
             threshold,
-            0,
+            10000 ether,
             AdvancedSafeInitParams({
                 includeFallbackHandler: true,
                 initData: "",
@@ -388,7 +406,7 @@ contract SafeTestTools {
         return _setupSafe(
             defaultPKs,
             2,
-            0,
+            10000 ether,
             AdvancedSafeInitParams({
                 includeFallbackHandler: true,
                 initData: "",
@@ -410,7 +428,9 @@ contract SafeTestTools {
     }
 
     function getSafe() public view returns (SafeInstance memory) {
-        if (instances.length == 0) revert("Test Safe has not been deployed, use _setupSafe() calling safe()");
+        if (instances.length == 0) {
+            revert("SAFETESTTOOLS: Test Safe has not been deployed, use _setupSafe() calling safe()");
+        }
         return instances[0];
     }
 
@@ -418,6 +438,6 @@ contract SafeTestTools {
         for (uint256 i; i < instances.length; ++i) {
             if (address(instances[i].safe) == _safe) return instances[i];
         }
-        revert("Safe instance not found");
+        revert("SAFETESTTOOLS: Safe instance not found");
     }
 }
