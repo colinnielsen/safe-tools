@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "forge-std/Test.sol";
-import "../src/SafeTest.sol";
+import "../src/SafeTestTools.sol";
 
 bytes4 constant EIP1271_VALUE = 0x1626ba7e;
 
