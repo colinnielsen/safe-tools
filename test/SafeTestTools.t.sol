@@ -7,7 +7,7 @@ import "../src/SafeTestTools.sol";
 bytes4 constant EIP1271_VALUE = 0x1626ba7e;
 
 contract TestSafeTestTools is Test, SafeTestTools {
-    using TestSafeLib for SafeInstance;
+    using SafeTestLib for SafeInstance;
 
     address alice = address(0xA11c3);
     address bob = address(0xb0b);

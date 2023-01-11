@@ -14,7 +14,7 @@ import "safe-tools/SafeTest.sol";
 import "forge-std/Test.sol";
 
 contract Test is Test, SafeTestTools {
-    using TestSafeLib for SafeInstance;
+    using SafeTestLib for SafeInstance;
 
     setUp() public {
         SafeInstance memory safeInstance = _setupSafe();
@@ -55,7 +55,7 @@ A safe instance stores:
 ## `SafeInstance` Methods
 Wrap the SafeInstance with SafeTestLib methods to add access wrappers for signing methods for common Safe methods.
 ```solidity
-using TestSafeLib for SafeInstance;
+using SafeTestLib for SafeInstance;
 ```
 
 ```solidity

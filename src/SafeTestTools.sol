@@ -100,7 +100,7 @@ struct SafeInstance {
     DeployedSafe safe;
 }
 
-library TestSafeLib {
+library SafeTestLib {
     function execTransaction(
         SafeInstance memory instance,
         address to,
@@ -288,7 +288,7 @@ library TestSafeLib {
 }
 
 contract SafeTestTools {
-    using TestSafeLib for SafeInstance;
+    using SafeTestLib for SafeInstance;
 
     GnosisSafe internal singleton = new GnosisSafe();
     GnosisSafeProxyFactory internal proxyFactory = new GnosisSafeProxyFactory();
