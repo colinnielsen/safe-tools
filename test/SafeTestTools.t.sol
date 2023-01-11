@@ -50,17 +50,46 @@ contract TestSafeTestTools is Test, SafeTestTools {
         bytes32 secretDigest = keccak256(bytes("SHHHHH"));
         safeInstance.EIP1271Sign(secretDigest);
 
-        assertTrue(safeInstance.safe.isValidSignature(secretDigest, "") == EIP1271_VALUE);
+        assertTrue(
+            safeInstance.safe.isValidSignature(secretDigest, "") ==
+                EIP1271_VALUE
+        );
     }
 
     function testSignTransaction() public {
         uint256[] memory ownerPKs = new uint256[](1);
         ownerPKs[0] = 12345;
-        SafeInstance memory instance = _setupSafe({ownerPKs: ownerPKs, threshold: 1, initialBalance: 1 ether});
-        (uint8 v, bytes32 r, bytes32 s) = instance.signTransaction(ownerPKs[0], alice, 0.5 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0));
+        SafeInstance memory instance = _setupSafe({
+            ownerPKs: ownerPKs,
+            threshold: 1,
+            initialBalance: 1 ether
+        });
+        (uint8 v, bytes32 r, bytes32 s) = instance.signTransaction(
+            ownerPKs[0],
+            alice,
+            0.5 ether,
+            "",
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            address(0)
+        );
         bytes memory signature = abi.encodePacked(r, s, v);
-        instance.safe.execTransaction(alice, 0.5 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signature);
-        assertEq(alice.balance, .5 ether);
+        instance.safe.execTransaction(
+            alice,
+            0.5 ether,
+            "",
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signature
+        );
+        assertEq(alice.balance, 0.5 ether);
     }
 
     function testIncrementNonce() public {

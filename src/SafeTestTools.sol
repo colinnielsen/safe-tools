@@ -281,9 +281,7 @@ library TestSafeLib {
         (v, r, s) = Vm(VM_ADDR).sign(pk, txDataHash);
     }
 
-    function incrementNonce(
-        SafeInstance memory instance
-    ) public returns (uint256 newNonce) {
+    function incrementNonce(SafeInstance memory instance) public returns (uint256 newNonce) {
         execTransaction(instance, address(0), 0, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0), "");
         return instance.safe.nonce();
     }
@@ -418,13 +416,6 @@ contract SafeTestTools {
                 refundReceiver: payable(address(0))
             })
         );
-    }
-
-    struct SafeTransaction {
-        address to;
-        uint256 value;
-        bytes data;
-        Enum.Operation operation;
     }
 
     function getSafe() public view returns (SafeInstance memory) {
