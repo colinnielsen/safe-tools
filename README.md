@@ -1,5 +1,5 @@
 # Gnosis Safe Tools for Foundry
-`SafeTestTools` is a friendly wrapper for deploying safes, executing transactions, performing EIP1271 signatures, and enabling/disabling modules. It manages `Safe` deployments, and manages private keys and transaction signing so you can simply call `_setupSafe()` and ensure your code works with Safe's as well as EOAs.
+`SafeTestTools` is a friendly wrapper for deploying safes, executing transactions, performing EIP1271 signatures, and enabling/disabling modules. It manages `Safe` deployments, private keys, and transaction signing so you can simply call `_setupSafe()` and ensure your code works with Safe's as well as EOAs.
 
 ## Before -> After
 
@@ -20,21 +20,34 @@ contract Test is Test, SafeTestTools {
         SafeInstance memory safeInstance = _setupSafe();
         address alice = address(0xA11c3);
 
-        safeInstance.execTransaction(alice, 0.5 ether, ""); // send .5 eth to alice
+        safeInstance.execTransaction({
+            to: alice,
+            value: 0.5 ether,
+            data: ""
+        }); // send .5 eth to alice
 
         assertEq(alice.balance, 0.5 ether); // passes ✅
     }
 }
 ```
 ## Basic Setup
-Use the `_setupSafe();` method to setup a `SafeInstance`.
+Use the `_setupSafe();` method to setup a `SafeInstance` with the default initialization parameters.
 ```solidity
 SafeInstance memory safeInstance = _setupSafe();
 ```
-`_setupSafe();` deploys a safe a 2/3 threshold safe with a `10000 ether` balance.
+
+### Default Parameters:
+
+1. Threshold: `2/3`
+2. Signers: The owners are the first 3 signers from the standard `test test test test test test test test test test test junk` derived accounts. These accounts are `vm.label`'d as `SAFETEST: Signer 0-2:` for Forge's call tacing functionality.
+3. Initial Balance: `10000 ether`
+4. Salt nonce: `0xbff0e1d6be3df3bedf05c892f554fbea3c6ca2bb9d224bc3f3d3fbc3ec267d1c`
+
+This will create a SafeInstance with the address of `0x4fFf49f984EFf15087e13d0176e13a5A5009bFaA`
+
 (See setup options for more details)
 
-## The Safe Instance:
+## The Safe Instance Struct:
 ```solidity
 struct SafeInstance {
     uint256 instanceId;
@@ -46,18 +59,21 @@ struct SafeInstance {
 ```
 
 A safe instance stores:
-- `instanceId` a unique id
-- `ownerPKs` an array of owner private keys (sorted by computed address) 
-- `owners` an array of owner addresses (sorted to match the private keys) 
-- `threshold` the signing threshold of the safe
-- `safe` the address of the deployed safe wrapped in a custom interface that includes: 1. `GnosisSafe.sol` methods 2. `CompatibilityFallbackHandler.sol` methods (for EIP1271 signature validation, messaging hashing, token callbacks, etc)
+1. `instanceId`: a unique id
+2. `ownerPKs`: an array of owner private keys (**NOTE! these PKs will be sorted by computed address for signing purposes**) 
+3. `owners`: an array of owner addresses (**sorted to match the private keys**)
+4. `threshold`: the signing threshold of the safe
+5. `safe`: the address of the deployed safe wrapped in a custom interface `DeployedSafe` that includes: 
+    - `GnosisSafe.sol` methods
+    - `CompatibilityFallbackHandler.sol` methods (for EIP1271 signature validation, messaging hashing, token callbacks, etc)
 
 ## `SafeInstance` Methods
-Wrap the SafeInstance with SafeTestLib methods to add access wrappers for signing methods for common Safe methods.
+Wrap the `SafeInstance` with `SafeTestLib` methods to add access wrappers for signing methods for common Safe methods.
 ```solidity
 using SafeTestLib for SafeInstance;
 ```
 
+### API
 ```solidity
 // EXEC FUNCTION VARIATIONS
 function execTransaction(
@@ -116,6 +132,3 @@ function signTransaction(
 ```
 # Advanced Usage
 ## Setup options TODO:
-```solidity
-
-```
