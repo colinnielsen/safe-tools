@@ -391,13 +391,16 @@ contract SafeTestTools {
 
     function _setupSafe() public returns (SafeInstance memory) {
         string[3] memory users;
-        users[0] = "SAFETEST: Alice";
-        users[1] = "SAFETEST: Bob";
-        users[2] = "SAFETEST: Charlie";
+        users[0] = "SAFETEST: Signer 0";
+        users[1] = "SAFETEST: Signer 1";
+        users[2] = "SAFETEST: Signer 2";
+
         uint256[] memory defaultPKs = new uint256[](3);
+        defaultPKs[0] = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
+        defaultPKs[1] = 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d;
+        defaultPKs[2] = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
 
         for (uint256 i; i < 3; i++) {
-            defaultPKs[i] = (uint256(keccak256(bytes(users[i]))));
             Vm(VM_ADDR).label(getAddr(defaultPKs[i]), users[i]);
         }
 
@@ -408,7 +411,7 @@ contract SafeTestTools {
             AdvancedSafeInitParams({
                 includeFallbackHandler: true,
                 initData: "",
-                saltNonce: 0,
+                saltNonce: uint256(keccak256(bytes("SAFE TEST"))),
                 setupModulesCall_to: address(0),
                 setupModulesCall_data: "",
                 refundAmount: 0,
