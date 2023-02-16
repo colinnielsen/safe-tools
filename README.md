@@ -132,3 +132,7 @@ function signTransaction(
 ```
 # Advanced Usage
 ## Setup options TODO:
+
+## License
+License
+MIT © Colin Nielsen
