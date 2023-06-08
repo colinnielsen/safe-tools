@@ -297,6 +297,13 @@ contract SafeTestTools {
     SafeInstance[] internal instances;
     /// takes in private keys, stores computed address?
 
+    /// @dev can be called to reinitialize the singleton, proxyFactory and handler. Useful for forking.
+    function _initializeSafeTools() internal {
+        singleton = new GnosisSafe();
+        proxyFactory = new GnosisSafeProxyFactory();
+        handler = new CompatibilityFallbackHandler();
+    }
+
     function _setupSafe(
         uint256[] memory ownerPKs,
         uint256 threshold,
