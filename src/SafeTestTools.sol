@@ -83,13 +83,13 @@ abstract contract DeployedSafe is GnosisSafe, CompatibilityFallbackHandler {}
 
 struct AdvancedSafeInitParams {
     bool includeFallbackHandler;
-    bytes initData;
     uint256 saltNonce;
     address setupModulesCall_to;
     bytes setupModulesCall_data;
     uint256 refundAmount;
     address refundToken;
     address payable refundReceiver;
+    bytes initData;
 }
 
 struct SafeInstance {
@@ -320,14 +320,27 @@ contract SafeTestTools {
                 owners[i] = getAddr(sortedPKs[i]);
             }
         }
+        // store the initialization parameters
+
+        bytes memory initData = advancedParams.initData.length > 0
+            ? advancedParams.initData
+            : abi.encodeWithSelector(
+                GnosisSafe.setup.selector,
+                owners,
+                threshold,
+                advancedParams.setupModulesCall_to,
+                advancedParams.setupModulesCall_data,
+                advancedParams.includeFallbackHandler ? address(handler) : address(0),
+                advancedParams.refundToken,
+                advancedParams.refundAmount,
+                advancedParams.refundReceiver
+            );
 
         DeployedSafe safe0 = DeployedSafe(
             payable(
                 advancedParams.saltNonce != 0
-                    ? proxyFactory.createProxyWithNonce(
-                        address(singleton), advancedParams.initData, advancedParams.saltNonce
-                    )
-                    : proxyFactory.createProxy(address(singleton), advancedParams.initData)
+                    ? proxyFactory.createProxyWithNonce(address(singleton), initData, advancedParams.saltNonce)
+                    : proxyFactory.createProxy(address(singleton), initData)
             )
         );
 
@@ -341,19 +354,8 @@ contract SafeTestTools {
         });
         instances.push(instance0);
 
-        // store the initialization parameters
-
         Vm(VM_ADDR).deal(address(safe0), initialBalance);
-        safe0.setup({
-            _owners: instance0.owners,
-            _threshold: instance0.threshold,
-            to: advancedParams.setupModulesCall_to, // address(0),
-            data: advancedParams.setupModulesCall_data, // "",
-            fallbackHandler: advancedParams.includeFallbackHandler ? address(handler) : address(0),
-            paymentToken: advancedParams.refundToken, // address(0),
-            payment: advancedParams.refundAmount, // 0,
-            paymentReceiver: advancedParams.refundReceiver
-        });
+
         return instance0;
     }
 
