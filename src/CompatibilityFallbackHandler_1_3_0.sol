@@ -8,9 +8,8 @@ import "safe-contracts/interfaces/IERC165.sol";
 import "safe-contracts/interfaces/ISignatureValidator.sol";
 import "safe-contracts/GnosisSafe.sol";
 
+/// @dev NOTE: removed VERSION and NAME due to inheritance conflicts
 contract DefaultCallbackHandler is ERC1155TokenReceiver, ERC777TokensRecipient, ERC721TokenReceiver, IERC165 {
-    // NOTE: removed VERSION and NAME
-
     function onERC1155Received(address, address, uint256, uint256, bytes calldata)
         external
         pure

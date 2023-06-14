@@ -1,4 +1,5 @@
 # Gnosis Safe Tools for Foundry
+
 `SafeTestTools` is a friendly wrapper for deploying safes, executing transactions, performing EIP1271 signatures, and enabling/disabling modules. It manages `Safe` deployments, private keys, and transaction signing so you can simply call `_setupSafe()` and ensure your code works with Safe's as well as EOAs.
 
 ## Before -> After
@@ -7,9 +8,9 @@
 
 # Basic Usage
 
-## Quick Start 
+## Quick Start
 
-```solidity 
+```solidity
 import "safe-tools/SafeTest.sol";
 import "forge-std/Test.sol";
 
@@ -30,8 +31,11 @@ contract Test is Test, SafeTestTools {
     }
 }
 ```
+
 ## Basic Setup
+
 Use the `_setupSafe();` method to setup a `SafeInstance` with the default initialization parameters.
+
 ```solidity
 SafeInstance memory safeInstance = _setupSafe();
 ```
@@ -43,37 +47,42 @@ SafeInstance memory safeInstance = _setupSafe();
 3. Initial Balance: `10000 ether`
 4. Salt nonce: `0xbff0e1d6be3df3bedf05c892f554fbea3c6ca2bb9d224bc3f3d3fbc3ec267d1c`
 
-This will create a SafeInstance with the address of `0x4fFf49f984EFf15087e13d0176e13a5A5009bFaA`
+This will create a SafeInstance with the address of `0x584a697DC2b125117d232Fca046f6cDe5Edd0ba7`
 
-(See setup options for more details)
+(See [Custom Setup](#custom-setup) for more setup options)
 
 ## The Safe Instance Struct:
+
 ```solidity
 struct SafeInstance {
     uint256 instanceId;
     uint256[] ownerPKs;
     address[] owners;
     uint256 threshold;
-    DeployedSafe safe; 
+    DeployedSafe safe;
 }
 ```
 
 A safe instance stores:
+
 1. `instanceId`: a unique id
-2. `ownerPKs`: an array of owner private keys (**NOTE! these PKs will be sorted by computed address for signing purposes**) 
+2. `ownerPKs`: an array of owner private keys (**NOTE! these PKs will be sorted by computed address for signing purposes**)
 3. `owners`: an array of owner addresses (**sorted to match the private keys**)
 4. `threshold`: the signing threshold of the safe
-5. `safe`: the address of the deployed safe wrapped in a custom interface `DeployedSafe` that includes: 
-    - `GnosisSafe.sol` methods
-    - `CompatibilityFallbackHandler.sol` methods (for EIP1271 signature validation, messaging hashing, token callbacks, etc)
+5. `safe`: the address of the deployed safe wrapped in a custom interface `DeployedSafe` that includes all:
+   - `GnosisSafe.sol` methods
+   - `CompatibilityFallbackHandler.sol` methods (for EIP1271 signature validation, messaging hashing, token callbacks, etc)
 
 ## `SafeInstance` Methods
+
 Wrap the `SafeInstance` with `SafeTestLib` methods to add access wrappers for signing methods for common Safe methods.
+
 ```solidity
 using SafeTestLib for SafeInstance;
 ```
 
 ### API
+
 ```solidity
 // EXEC FUNCTION VARIATIONS
 function execTransaction(
@@ -130,9 +139,65 @@ function signTransaction(
 ) public view returns (uint8 v, bytes32 r, bytes32 s)
 
 ```
-# Advanced Usage
-## Setup options TODO:
+
+# Custom Setup
+
+## Setup options:
+
+Then there are a few overrides of `_setupSafe()` at your disposal for custom Safe setup:
+
+```solidity
+// pass an array of uint256 private keys
+function _setupSafe(
+    uint256[] memory ownerPKs,
+    uint256 threshold
+) public returns (SafeInstance memory);
+
+// you could also specify the initial balance of the Safe
+function _setupSafe(
+    uint256[] memory ownerPKs,
+    uint256 threshold,
+    uint256 initialBalance
+) public returns (SafeInstance memory);
+
+// or if you need to fully tweak the Safe setup parameters, you can pass an `AdvancedSafeInitParams` struct
+function _setupSafe(
+    uint256[] memory ownerPKs,
+    uint256 threshold,
+    uint256 initialBalance,
+    AdvancedSafeInitParams memory advancedParams
+) public returns (SafeInstance memory)
+```
+
+### `AdvancedSafeInitParams`
+
+Passing the `AdvancedSafeInitParams` struct allows you to _fully_ customize the Safe setup call parameters. The struct is defined as follows:
+
+```solidity
+struct AdvancedSafeInitParams {
+    bool includeFallbackHandler;
+    uint256 saltNonce;
+    address setupModulesCall_to;
+    bytes setupModulesCall_data;
+    uint256 refundAmount;
+    address refundToken;
+    address payable refundReceiver;
+    bytes initData;
+}
+```
+
+| Param                    | Type              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `includeFallbackHandler` | `bool`            | Whether or not to include the [`CompatibilityFallbackHandler`](https://github.com/safe-global/safe-contracts/blob/v1.3.0/contracts/handler/CompatibilityFallbackHandler.sol) contract in the Safe setup. The `fallbackHandler` receives calls to the Safe with unrecognized signatures. This contains EIP1271 signature validation, allows the Safe to receive EIP712, 1155, and 777 tokens, and includes fallbacks for previous Safe versions.                                                                                                                                                                                       |
+| `saltNonce`              | `uint256`         | The salt nonce to use when deploying the Safe. Passing `saltNonce > 0` will call `createProxyWithNonce()` method on the SafeFactory. `createProxy()` will be called otherwise.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `setupModulesCall_to`    | `address`         | An address that receives a `delegateCall` with `setupModulesCall_data` as part of the [`setupModules()`](https://github.com/safe-global/safe-contracts/blob/v1.3.0/contracts/base/ModuleManager.sol#LL20C1-L26C6) call during Safe setup. This is useful for setting up modules during initialization.                                                                                                                                                                                                                                                                                                                                |
+| `setupModulesCall_data`  | `bytes`           | The `delegateCall` data for the `setupModulesCall_to` call. See above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `refundAmount`           | `uint256`         | The amount of `refundToken` to send to `refundReceiver` after Safe setup.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `refundToken`            | `address`         | The address of the token to refund. **NOTE:** `address(0)` indicates native token. If `refundAmount > 0`, a deployment refund will initiate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `refundReceiver`         | `address payable` | The address to receive the `refundAmount` of `refundToken`. **NOTE:** `address(0)` indicates `tx.origin` and will doesn't make senes for Foundry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `initData`               | `bytes`           | When creating a safe from Safe UI, the `data` param in the Factory call includes the `setup()` transaction. A setup transaction is just the `abi.encoded` call to `setup` on the Safe contract after the factory deploys the SafeProxy ([see how I do this behind the scenes]()). If you wish to implement a custom Safe `setup()` call, you can override `advancedInitParams.initData` with your own bytes string. **NOTE:** overriding the `initData` will override the following above params by default `setupModulesCall_to`, `setupModulesCall_data`, `includeFallbackHandler`, `refundToken`, `refundAmount`, `refundReceiver` |
 
 ## License
+
 License
 MIT © Colin Nielsen
