@@ -1,11 +1,11 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-	branch = v1.2.0
 [submodule "lib/safe-contracts"]
 	path = lib/safe-contracts
 	url = https://github.com/safe-global/safe-contracts
-	branch = v1.3.0
+	# Using release 1.4.1
+	commit = bf943f80fec5ac647159d26161446ac5d716a294
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
