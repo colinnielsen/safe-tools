@@ -113,7 +113,7 @@ library SafeTestLib {
         address gasToken,
         address refundReceiver,
         bytes memory signatures
-    ) public returns (bool) {
+    ) internal returns (bool) {
         if (instance.owners.length == 0) {
             revert("SAFETEST: Instance not initialized. Call _setupSafe() to initialize a test safe");
         }
@@ -171,13 +171,13 @@ library SafeTestLib {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) public returns (bool) {
+    ) internal returns (bool) {
         return execTransaction(instance, to, value, data, operation, 0, 0, 0, address(0), address(0), "");
     }
 
     /// @dev performs a noraml "call"
     function execTransaction(SafeInstance memory instance, address to, uint256 value, bytes memory data)
-        public
+        internal
         returns (bool)
     {
         return execTransaction(instance, to, value, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), "");
@@ -227,7 +227,7 @@ library SafeTestLib {
         );
     }
 
-    function EIP1271Sign(SafeInstance memory instance, bytes memory data) public {
+    function EIP1271Sign(SafeInstance memory instance, bytes memory data) internal {
         address signMessageLib = address(new SignMessageLib());
         execTransaction({
             instance: instance,
