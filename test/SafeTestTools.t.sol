@@ -73,4 +73,10 @@ contract TestSafeTestTools is Test, SafeTestTools {
         instance.incrementNonce();
         assertEq(instance.safe.nonce(), nonceBefore + 1);
     }
+
+    function testSaltNonceAutoIncrements() public {
+        SafeInstance memory instance = _setupSafe();
+        instance = _setupSafe();
+        instance = _setupSafe();
+    }
 }

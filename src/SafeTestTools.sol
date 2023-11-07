@@ -340,9 +340,13 @@ contract SafeTestTools {
 
         DeployedSafe safe0 = DeployedSafe(
             payable(
-                advancedParams.saltNonce != 0
-                    ? proxyFactory.createProxyWithNonce(address(singleton), initData, advancedParams.saltNonce)
-                    : proxyFactory.createProxyWithNonce(address(singleton), initData, 0)
+                proxyFactory.createProxyWithNonce(
+                    address(singleton),
+                    initData,
+                    advancedParams.saltNonce == 0
+                        ? uint256(keccak256(abi.encode("SAFE_TEST_TOOLS", instances.length)))
+                        : advancedParams.saltNonce
+                )
             )
         );
 
@@ -422,7 +426,7 @@ contract SafeTestTools {
             AdvancedSafeInitParams({
                 includeFallbackHandler: true,
                 initData: "",
-                saltNonce: uint256(keccak256(bytes("SAFE TEST"))),
+                saltNonce: 0,
                 setupModulesCall_to: address(0),
                 setupModulesCall_data: "",
                 refundAmount: 0,

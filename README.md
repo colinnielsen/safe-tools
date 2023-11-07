@@ -42,12 +42,12 @@ SafeInstance memory safeInstance = _setupSafe();
 
 ### Default Parameters:
 
-1. Threshold: `2/3`
-2. Signers: The owners are the first 3 signers from the standard `test test test test test test test test test test test junk` derived accounts. These accounts are `vm.label`'d as `SAFETEST: Signer 0-2:` for Forge's call tacing functionality.
-3. Initial Balance: `10000 ether`
-4. Salt nonce: `0xbff0e1d6be3df3bedf05c892f554fbea3c6ca2bb9d224bc3f3d3fbc3ec267d1c`
+1. **Threshold**: `2/3`
+2. **Signers**: The owners are the first 3 signers from the standard `test test test test test test test test test test test junk` derived accounts. These accounts are `vm.label`'d as `SAFETEST: Signer 0-2:` for Forge's call tracing functionality.
+3. **Initial Balance**: `10000 ether`
+4. **Salt Nonce**: `0xbff0e1d6be3df3bedf05c892f554fbea3c6ca2bb9d224bc3f3d3fbc3ec267d1c`
 
-This will create a SafeInstance with the address of `0x584a697DC2b125117d232Fca046f6cDe5Edd0ba7`
+This will create a `SafeInstance` with the address of `0x584a697DC2b125117d232Fca046f6cDe5Edd0ba7`
 
 (See [Custom Setup](#custom-setup) for more setup options)
 
