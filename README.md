@@ -11,7 +11,7 @@
 ## Quick Start
 
 ```solidity
-import "safe-tools/SafeTest.sol";
+import "safe-tools/SafeTestTools.sol";
 import "forge-std/Test.sol";
 
 contract Test is Test, SafeTestTools {
