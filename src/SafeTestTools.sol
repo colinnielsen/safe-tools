@@ -112,20 +112,27 @@ library SafeTestLib {
         uint256 gasPrice,
         address gasToken,
         address refundReceiver,
-        bytes memory
-    )
         /**
-         * signatures
+         * signature (is ignored)
          */
-        internal
-        returns (bool)
-    {
+        bytes memory
+    ) internal returns (bool) {
         Vm(VM_ADDR).store(
             address(instance.safe),
             bytes32(uint256(0x04)), // threshold slot
             bytes32(uint256(1))
         );
         address owner0 = instance.owners[0];
+
+        // init a new 65-byte long array
+        bytes memory sig = new bytes(65);
+
+        assembly ("memory-safe") {
+            // store the left-padded address after the array's 32 byte pointer
+            mstore(add(sig, 0x20), owner0)
+            // store 1 as the v byte to signify an "approved hash"
+            mstore(add(sig, 0x41), 1)
+        }
 
         Vm(VM_ADDR).prank(owner0);
         return instance.safe.execTransaction(
