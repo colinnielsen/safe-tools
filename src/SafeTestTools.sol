@@ -112,9 +112,34 @@ library SafeTestLib {
         uint256 gasPrice,
         address gasToken,
         address refundReceiver,
-        bytes memory signatures
-    ) internal returns (bool) {
-        return true;
+        bytes memory
+    )
+        /**
+         * signatures
+         */
+        internal
+        returns (bool)
+    {
+        Vm(VM_ADDR).store(
+            address(instance.safe),
+            bytes32(uint256(0x04)), // threshold slot
+            bytes32(uint256(1))
+        );
+        address owner0 = instance.owners[0];
+
+        Vm(VM_ADDR).prank(owner0);
+        return instance.safe.execTransaction(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            payable(refundReceiver),
+            abi.encodePacked(bytes32(uint256(uint160(owner0))), bytes1(0x00), bytes32(uint256(0x01)))
+        );
     }
 
     function execTransaction(
@@ -132,31 +157,11 @@ library SafeTestLib {
     ) internal returns (bool) {
         if (instance.instanceType == InstanceType.Test) {
             return _execTxWithLocalPKs(
-                instance,
-                to,
-                value,
-                data,
-                operation,
-                safeTxGas,
-                baseGas,
-                gasPrice,
-                gasToken,
-                refundReceiver,
-                signatures
+                instance, to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures
             );
         } else {
             return _spoofSigWithStorageOverride(
-                instance,
-                to,
-                value,
-                data,
-                operation,
-                safeTxGas,
-                baseGas,
-                gasPrice,
-                gasToken,
-                refundReceiver,
-                signatures
+                instance, to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures
             );
         }
     }
@@ -308,16 +313,24 @@ contract SafeTestTools {
 
         uint256[] memory ownerPKs = new uint256[](0);
 
+        address[] memory owners = safe.getOwners();
+
+        if (owners.length == 0) {
+            revert("SAFETESTTOOLS: attempted to attach to non-existent safe!");
+        }
+
         SafeInstance memory instance0 = SafeInstance({
             instanceType: InstanceType.Live,
             instanceId: instances.length,
             ownerPKs: ownerPKs,
-            owners: safe.getOwners(),
+            owners: owners,
             threshold: safe.getThreshold(),
             safe: safe
         });
 
         instances.push(instance0);
+
+        return instance0;
     }
 
     function _setupSafe(

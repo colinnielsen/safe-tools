@@ -79,4 +79,16 @@ contract TestSafeTestTools is Test, SafeTestTools {
         instance = _setupSafe();
         instance = _setupSafe();
     }
+
+    function testCanAttachToSafe() public {
+        vm.createSelectFork(vm.envString("ETH_RPC_URL"));
+
+        address vienna_safe = 0x9A2755701dCE41cd124e59865fA0734d15200711;
+        SafeInstance memory instance = _attachToSafe(vienna_safe);
+        vm.deal(vienna_safe, 1 ether);
+
+        instance.execTransaction(address(0xA11c3), 1 ether, "");
+
+        assertEq(address(0xA11c3).balance, 1 ether);
+    }
 }
