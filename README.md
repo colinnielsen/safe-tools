@@ -6,9 +6,41 @@
 
 <img width="2578" alt="Before after" src="https://user-images.githubusercontent.com/33375223/211921017-b57ae2f3-0d33-4265-a87d-945a69a77ba6.png">
 
-# Basic Usage
+# Quick Start
 
-## Quick Start
+## Pre-Deployed Safe (Spoof Safe Tx's in a Fork Test)
+
+In a fork test, you can "attach" to a deployed safe and spoof transactions.
+
+This is great for running `forge script` POCs, where you need to simulate transaction execution from a Safe
+
+```solidity
+import "safe-tools/SafeTestTools.sol";
+import "forge-std/Test.sol";
+
+contract Test is Test, SafeTestTools {
+    using SafeTestLib for SafeInstance;
+
+    setUp() public {
+        vm.createSelectFork("RPC_HERE");
+
+        address frax_safe = 0xB1748C79709f4Ba2Dd82834B8c82D4a505003f27;
+        SafeInstance memory instance = _attachToSafe(frax_safe);
+
+        safeInstance.execTransaction({
+            to: alice,
+            value: 0.5 ether,
+            data: ""
+        }); // send .5 eth to alice
+
+        assertEq(alice.balance, 0.5 ether); // passes ✅
+    }
+}
+```
+
+NOTE: Attached safes are stored with `instance.instanceType == InstanceType.Live`
+
+## New Safe (Deploy a Safe w/ Default Signers via SafeProxyFactory)
 
 ```solidity
 import "safe-tools/SafeTestTools.sol";
@@ -55,6 +87,7 @@ This will create a `SafeInstance` with the address of `0x584a697DC2b125117d232Fc
 
 ```solidity
 struct SafeInstance {
+    InstanceType instanceType, // either InstanceType.Test | InstanceType.Live
     uint256 instanceId;
     uint256[] ownerPKs;
     address[] owners;
