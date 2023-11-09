@@ -9,7 +9,7 @@ bytes4 constant EIP1271_VALUE = 0x1626ba7e;
 contract TestSafeTestTools is Test, SafeTestTools {
     using SafeTestLib for SafeInstance;
 
-    function setup() public {
+    function setUp() public {
         vm.createSelectFork(vm.envString("ETH_RPC_URL"));
     }
 
