@@ -5,7 +5,6 @@ import "safe-contracts/interfaces/ERC1155TokenReceiver.sol";
 import "safe-contracts/interfaces/ERC721TokenReceiver.sol";
 import "safe-contracts/interfaces/ERC777TokensRecipient.sol";
 import "safe-contracts/interfaces/IERC165.sol";
-import "safe-contracts/interfaces/ISignatureValidator.sol";
 import "safe-contracts/Safe.sol";
 
 contract DefaultCallbackHandler is ERC1155TokenReceiver, ERC777TokensRecipient, ERC721TokenReceiver, IERC165 {
@@ -49,7 +48,9 @@ address constant SENTINEL_MODULES = address(0x1);
 
 /// @title Compatibility Fallback Handler - fallback handler to provider compatibility between pre 1.3.0 and 1.3.0+ Safe contracts
 /// @author Richard Meissner - <richard@gnosis.pm>
-contract CompatibilityFallbackHandler is DefaultCallbackHandler, ISignatureValidator {
+contract CompatibilityFallbackHandler is DefaultCallbackHandler {
+    bytes4 internal constant EIP1271_VALUE = 0x20c13b0b;
+
     //keccak256(
     //    "SafeMessage(bytes message)"
     //);
@@ -75,7 +76,7 @@ contract CompatibilityFallbackHandler is DefaultCallbackHandler, ISignatureValid
         } else {
             safe.checkSignatures(messageHash, _data, _signature);
         }
-        return EIP1271_MAGIC_VALUE;
+        return EIP1271_VALUE;
     }
 
     /// @dev Returns hash of a message that can be signed by owners.
@@ -104,10 +105,10 @@ contract CompatibilityFallbackHandler is DefaultCallbackHandler, ISignatureValid
      * @return a bool upon valid or invalid signature with corresponding _dataHash
      * @notice See https://github.com/gnosis/util-contracts/blob/bb5fe5fb5df6d8400998094fb1b32a178a47c3a1/contracts/StorageAccessible.sol
      */
-    function isValidSignature(bytes32 _dataHash, bytes calldata _signature) external view virtual override returns (bytes4) {
+    function isValidSignature(bytes32 _dataHash, bytes calldata _signature) external view returns (bytes4) {
         ISignatureValidator validator = ISignatureValidator(msg.sender);
-        bytes4 value = validator.isValidSignature(keccak256(abi.encode(_dataHash)), _signature);
-        return (value == EIP1271_MAGIC_VALUE) ? UPDATED_MAGIC_VALUE : bytes4(0);
+        bytes4 value = validator.isValidSignature(abi.encode(_dataHash), _signature);
+        return (value == EIP1271_VALUE) ? UPDATED_MAGIC_VALUE : bytes4(0);
     }
 
     /// @dev Returns array of first 10 modules.
