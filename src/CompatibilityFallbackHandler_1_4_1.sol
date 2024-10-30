@@ -106,7 +106,7 @@ contract CompatibilityFallbackHandler is DefaultCallbackHandler {
      * @notice See https://github.com/gnosis/util-contracts/blob/bb5fe5fb5df6d8400998094fb1b32a178a47c3a1/contracts/StorageAccessible.sol
      */
     function isValidSignature(bytes32 _dataHash, bytes calldata _signature) external view returns (bytes4) {
-        bytes4 value = this.isValidSignature(abi.encode(_dataHash), _signature);
+        bytes4 value = CompatibilityFallbackHandler(msg.sender).isValidSignature(abi.encode(_dataHash), _signature);
         return (value == EIP1271_VALUE) ? UPDATED_MAGIC_VALUE : bytes4(0);
     }
 
